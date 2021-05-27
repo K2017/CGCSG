@@ -35,19 +35,16 @@ int main(int argc, char *argv[]) {
     screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
     t = SDL_GetTicks();    // Set start value for timer.
 
-    //auto cornellBox = std::make_shared<CornellBox>();
-
     framebuffer = std::vector<std::tuple<int, int, vec3>>(SCREEN_WIDTH * SCREEN_HEIGHT);
 
-    scene = std::make_unique<Scene>(vec3{0.8, 0.8, 0.9},
-                      SceneProperties{
-                              .illumination = true,
-                              .fresnel = true,
-                              .shadowing = true,
-                              .shadowIntensity = 16.f,
-                              .maxDepth = 8
-                      });
-    //scene->addObject(cornellBox);
+    scene = std::make_unique<Scene>(SceneProperties{
+            .backgroundColor{0.8, 0.8, 0.9},
+            .illumination = true,
+            .fresnel = true,
+            .shadowing = true,
+            .shadowIntensity = 16.f,
+            .maxDepth = 8
+    });
 
     auto mainLight = std::make_shared<Light>(vec3{-0.4, -1.0, -0.7}, vec3{1, 1, 1}, 10.f);
     scene->addLight(mainLight);
@@ -69,10 +66,10 @@ int main(int argc, char *argv[]) {
 
     auto sphere3 = Builder<Sphere>(0.8f).build();
     sphere3->setMaterial(Material{
-        .albedo{.15, .75, .75},
-        .ks = 1.0,
-        .ior = 1.3,
-        .transmittance = 0.
+            .albedo{.15, .75, .75},
+            .ks = 1.0,
+            .ior = 1.3,
+            .transmittance = 0.
     });
     auto trSphere3 = Builder<Transform>(sphere3, vec3{-1., 0, 0.6}).build();
     scene->addSDFObject(trSphere3);
@@ -99,17 +96,7 @@ int main(int argc, char *argv[]) {
     });
     scene->addSDFObject(ground);
 
-    bool realtime = true;
-    if (false) {
-        while (NoQuitMessageSDL()) {
-            Update();
-            Draw();
-        }
-    } else {
-        Update();
-        Draw();
-    }
-
+    Draw();
     Update();
 
     SDL_SaveBMP(screen, "screenshot.bmp");
@@ -164,8 +151,8 @@ void Update() {
     }
 }
 
-void SetFramebuffer(int x, int y, const vec3& color) {
-    framebuffer.at(y*screen->pitch/4 + x) = std::make_tuple(x, y, color);
+void SetFramebuffer(int x, int y, const vec3 &color) {
+    framebuffer.at(y * screen->pitch / 4 + x) = std::make_tuple(x, y, color);
 }
 
 void Draw() {
