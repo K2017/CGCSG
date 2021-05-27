@@ -13,10 +13,11 @@
 #include <numbers>
 
 struct SceneProperties {
+    vec3 backgroundColor = vec3{0};
     bool illumination = false;
     bool fresnel = false;
     bool shadowing = false;
-    float shadowIntensity = 1.f;
+    float shadowFactor = 1.f;
     int maxRaymarchSteps = 500;
     float maxRaymarchDist = 20.f;
     int maxDepth = 0;
@@ -24,7 +25,7 @@ struct SceneProperties {
 
 class Scene {
 public:
-    explicit Scene(const vec3 &background, const SceneProperties &properties = SceneProperties{});
+    explicit Scene(const SceneProperties &properties = SceneProperties{});
 
     vec3 trace(const Ray &ray);
 
@@ -59,15 +60,14 @@ public:
         return lights.at(index);
     }
 
-    void addSDFObject(const std::shared_ptr<sdf::Node> &sdf) {
-        sdfNodes.push_back(sdf);
+    void addObject(const std::shared_ptr<sdf::Node> &sdf) {
+        nodes.push_back(sdf);
     }
 
     std::pair<std::shared_ptr<sdf::Node>, float> minimumSurface(const vec3 &p);
 
 private:
-    std::vector<std::shared_ptr<sdf::Node>> sdfNodes;
-    vec3 background;
+    std::vector<std::shared_ptr<sdf::Node>> nodes;
     std::vector<std::shared_ptr<Light>> lights;
     std::vector<std::shared_ptr<Camera>> cameras;
     int activeCamIndex = 0;
@@ -91,10 +91,7 @@ private:
     vec3 trace(const Ray &ray, int depth);
 };
 
-Scene::Scene(const vec3 &background, const SceneProperties &properties)
-        :
-        background(background),
-        properties(properties) {}
+Scene::Scene(const SceneProperties &properties) : properties(properties) {}
 
 std::pair<vec3, vec3>
 Scene::computeLightingModel(const vec3 &p, const vec3 &N, const vec3 &V, const Material &material) {
@@ -116,7 +113,7 @@ Scene::computeLightingModel(const vec3 &p, const vec3 &N, const vec3 &V, const M
             const vec3 pos = p + sBias;
 
             const Ray r(pos, L);
-            float factor = computeShadow(r, properties.shadowIntensity);
+            float factor = computeShadow(r, properties.shadowFactor);
             I_D *= factor;
             I_S *= factor;
 
@@ -131,7 +128,7 @@ vec3 Scene::trace(const Ray &ray, int depth) {
     auto [node, t] = raycast(ray);
 
     if (t < 0) {
-        return background;
+        return properties.backgroundColor;
     }
 
     vec3 p = ray.at(t);
@@ -205,7 +202,7 @@ std::pair<std::shared_ptr<sdf::Node>, float> Scene::minimumSurface(const vec3 &p
 
     float min = std::numeric_limits<float>::infinity();
     std::shared_ptr<sdf::Node> minNode;
-    for (auto& node : sdfNodes) {
+    for (auto& node : nodes) {
         float d = node->signedDistance(p);
         if (d < min) {
             min = d;

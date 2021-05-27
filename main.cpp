@@ -3,8 +3,8 @@
 #include "sdf/sdf.h"
 #include "SDLauxiliary.h"
 #include "scene.h"
+#include <mpi.h>
 
-using namespace std;
 using glm::vec3;
 using glm::mat3;
 using namespace sdf;
@@ -31,22 +31,41 @@ void Update();
 
 void Draw();
 
-int main(int argc, char *argv[]) {
-    screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
-    t = SDL_GetTicks();    // Set start value for timer.
+int w_size, w_rank;
+int stripe_h;
+int stripe_start;
 
-    //auto cornellBox = std::make_shared<CornellBox>();
+int main(int argc, char **argv) {
 
-    framebuffer = std::vector<std::tuple<int, int, vec3>>(SCREEN_WIDTH * SCREEN_HEIGHT);
+    int threads;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_SINGLE, &threads);
 
-    scene = std::make_unique<Scene>(vec3{0.8, 0.8, 0.9},
-                      SceneProperties{
-                              .illumination = true,
-                              .fresnel = true,
-                              .shadowing = true,
-                              .shadowIntensity = 16.f,
-                              .maxDepth = 8
-                      });
+    MPI_Comm_size(MPI_COMM_WORLD, &w_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &w_rank);
+
+    stripe_h = SCREEN_HEIGHT / w_size;
+    stripe_start = w_rank * stripe_h;
+
+    if (w_rank == 0) {
+        screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
+        t = SDL_GetTicks();    // Set start value for timer.
+    }
+
+    int buffer = SCREEN_WIDTH * stripe_h;
+    if (w_rank == 0) {
+        buffer = SCREEN_WIDTH * SCREEN_HEIGHT;
+    }
+
+    framebuffer = std::vector<std::tuple<int, int, vec3>>(buffer);
+
+    scene = std::make_unique<Scene>(SceneProperties{
+            .backgroundColor{0.8, 0.8, 0.9},
+            .illumination = true,
+            .fresnel = true,
+            .shadowing = true,
+            .shadowFactor = 16.f,
+            .maxDepth = 8
+    });
     //scene->addObject(cornellBox);
 
     auto mainLight = std::make_shared<Light>(vec3{-0.4, -1.0, -0.7}, vec3{1, 1, 1}, 10.f);
@@ -65,17 +84,17 @@ int main(int argc, char *argv[]) {
     });
     auto bubble = Builder<Onion>(sphere1, 0.01).build();
     auto trBubble = Builder<Transform>(bubble, vec3{0, 0.48f, 0}).build();
-    scene->addSDFObject(trBubble);
+    scene->addObject(trBubble);
 
     auto sphere3 = Builder<Sphere>(0.8f).build();
     sphere3->setMaterial(Material{
-        .albedo{.15, .75, .75},
-        .ks = 1.0,
-        .ior = 1.3,
-        .transmittance = 0.
+            .albedo{.15, .75, .75},
+            .ks = 1.0,
+            .ior = 1.3,
+            .transmittance = 0.
     });
     auto trSphere3 = Builder<Transform>(sphere3, vec3{-1., 0, 0.6}).build();
-    scene->addSDFObject(trSphere3);
+    scene->addObject(trSphere3);
 
     auto torus = Builder<Torus>(glm::vec2{0.5, 0.1})
             .withMaterial(Material{
@@ -88,7 +107,7 @@ int main(int argc, char *argv[]) {
     auto trTorus = std::make_shared<Transform>(torus, vec3{0.25, 0, 0.1}, vec3{45, 0, 0});
 
     auto glob = std::make_shared<Union>(trBubble, trTorus, true, 0.08f);
-    scene->addSDFObject(glob);
+    scene->addObject(glob);
 
     auto ground = std::make_shared<sdf::Plane>(vec3{0, -1.f, 0}, 1.f);
     ground->setMaterial(Material{
@@ -97,22 +116,17 @@ int main(int argc, char *argv[]) {
             .p = 128,
             .ior = 1.33f
     });
-    scene->addSDFObject(ground);
+    scene->addObject(ground);
 
-    bool realtime = true;
-    if (false) {
-        while (NoQuitMessageSDL()) {
-            Update();
-            Draw();
-        }
-    } else {
+    if (w_rank == 0)
         Update();
-        Draw();
+    Draw();
+
+    if (w_rank == 0) {
+        Update();
+        SDL_SaveBMP(screen, "screenshot.bmp");
     }
-
-    Update();
-
-    SDL_SaveBMP(screen, "screenshot.bmp");
+    MPI_Finalize();
     return 0;
 }
 
@@ -121,7 +135,7 @@ void Update() {
     int t2 = SDL_GetTicks();
     auto dt = float(t2 - t);
     t = t2;
-    cout << "Render time: " << dt << " ms." << endl;
+    std::cout << "Render time: " << dt << " ms." << std::endl;
     auto keystate = SDL_GetKeyState(nullptr);
 
     auto camera = scene->getActiveCamera();
@@ -164,32 +178,33 @@ void Update() {
     }
 }
 
-void SetFramebuffer(int x, int y, const vec3& color) {
-    framebuffer.at(y*screen->pitch/4 + x) = std::make_tuple(x, y, color);
+void SetFramebuffer(int x, int y, const vec3 &color) {
+    framebuffer.at(y * screen->pitch / 4 + x) = std::make_tuple(x, y, color);
 }
 
 void Draw() {
 
-    for (int y = 0; y < SCREEN_HEIGHT; ++y) {
-#pragma omp parallel for
+    for (int y = stripe_start; y < stripe_h; ++y) {
         for (int x = 0; x < SCREEN_WIDTH; ++x) {
             auto ray = Ray::fromView(x, y, SCREEN_WIDTH, SCREEN_HEIGHT, scene->getActiveCamera());
 
             auto color = scene->trace(ray);
-            SetFramebuffer(x, y, color);
+            SetFramebuffer(x, y - stripe_start, color);
         }
     }
 
-    if (SDL_MUSTLOCK(screen))
-        SDL_LockSurface(screen);
+    if (w_rank == 0) {
+        if (SDL_MUSTLOCK(screen))
+            SDL_LockSurface(screen);
 
-    for (auto &[x, y, color] : framebuffer) {
-        PutPixelSDL(screen, x, y, color);
+        for (auto &[x, y, color] : framebuffer) {
+            PutPixelSDL(screen, x, y, color);
+        }
+
+        if (SDL_MUSTLOCK(screen))
+            SDL_UnlockSurface(screen);
+
+        SDL_UpdateRect(screen, 0, 0, 0, 0);
     }
-
-    if (SDL_MUSTLOCK(screen))
-        SDL_UnlockSurface(screen);
-
-    SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
