@@ -29,6 +29,13 @@ public:
         mixed.transmittance = glm::mix(a.transmittance, b.transmittance, factor);
         return mixed;
     }
+
+    static Material Default() {
+        return {
+            .albedo{0.8, 0.8, 0.8},
+            .kd = 0.8
+        };
+    }
 };
 
 #endif //PROJECT_MATERIAL_H

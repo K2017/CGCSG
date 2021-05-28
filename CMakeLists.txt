@@ -25,4 +25,3 @@ if(SDL_FOUND)
 endif(SDL_FOUND)
 
 target_link_libraries(Project PRIVATE glm::glm OpenMP::OpenMP_CXX)
-

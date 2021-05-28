@@ -14,6 +14,7 @@
 
 struct SceneProperties {
     vec3 backgroundColor = vec3{0};
+    bool debugNormals = false;
     bool illumination = false;
     bool fresnel = false;
     bool shadowing = false;
@@ -57,6 +58,9 @@ public:
     }
 
     std::shared_ptr<Light> getLight(int index) {
+        if (index >= lights.size()) {
+            return nullptr;
+        }
         return lights.at(index);
     }
 
@@ -67,6 +71,8 @@ public:
     std::pair<std::shared_ptr<sdf::Node>, float> minimumSurface(const vec3 &p);
 
 private:
+    SceneProperties properties;
+
     std::vector<std::shared_ptr<sdf::Node>> sdfNodes;
     std::vector<std::shared_ptr<Light>> lights;
     std::vector<std::shared_ptr<Camera>> cameras;
@@ -79,14 +85,17 @@ private:
 
     float computeShadow(const Ray &r, float k);
 
-    static float computeFresnel(const vec3 &I, const vec3 &N, float etai, float etat = 1);
-
-    SceneProperties properties;
+    float computeFresnel(const vec3 &I, const vec3 &N, float etai, float etat = 1);
 
     vec3
     finalColor(const Material &material, const vec3 &diffuse, const vec3 &specular, const vec3 &refraction,
                const vec3 &reflection,
                float kr);
+
+    void addDefaultLight() {
+        auto light = std::make_shared<Light>(vec3{0, -1.0, -0.5}, vec3{1, 1, 1}, 10.f);
+        addLight(light);
+    }
 
     vec3 trace(const Ray &ray, int depth);
 };
@@ -142,8 +151,14 @@ vec3 Scene::trace(const Ray &ray, int depth) {
     vec3 diffuse{0}, specular{0};
     Material material = sample.material;
 
+    if (properties.debugNormals) {
+        return N * 0.5f + 0.5f;
+    }
+
     if (properties.illumination) {
         std::tie(diffuse, specular) = computeLightingModel(p, facingNormal, -ray.dir, material);
+    } else {
+        diffuse = vec3{1};
     }
 
     float kr = 0.5f;
@@ -279,6 +294,9 @@ float Scene::computeShadow(const Ray &r, float k) {
 }
 
 vec3 Scene::trace(const Ray &ray) {
+    if (lights.empty()) {
+        addDefaultLight();
+    }
     return trace(ray, properties.maxDepth);
 }
 
