@@ -177,5 +177,62 @@ namespace example {
 
         return scene;
     }
+
+    ScenePtr triangles(int height, int width) {
+        auto scene = std::make_unique<Scene>(SceneProperties{
+                .backgroundColor{0.8, 0.8, 0.9},
+                .illumination = true,
+                .fresnel = true,
+                .maxDepth = 8
+        });
+
+        auto mainLight = std::make_shared<Light>(vec3{-0.4, -1.0, -0.7}, vec3{1, 1, 1}, 10.f);
+        scene->addLight(mainLight);
+
+        auto light1 = std::make_shared<Light>(vec3{1.3, 0.5, -1.1}, vec3{0.4, 0.4, 1}, 15.f);
+        scene->addLight(light1);
+
+        auto camera = std::make_shared<Camera>(vec3{0, 0, -3.f}, vec3{0, 1.f, 0}, (float) width);
+        scene->setActiveCamera(camera);
+
+        Material mat1 = {
+                .albedo{0.75, 0.75, 0.1},
+                .ks = 1.f,
+                .p = 36.f,
+                .ior = 1.45f,
+                .transmittance = 0.8,
+        };
+
+        Material mat2 = {
+                .albedo{0.1, 0.75, 0.75},
+                .ks = 1.f,
+                .p = 36.f,
+                .ior = 1.45f,
+                .transmittance = 0.8,
+        };
+
+        auto triangle1 = Builder<Triangle>(vec3{0, 0, 0}, vec3{0.8, 0, 0}, vec3{0.8, -0.8, 0})
+                .withMaterial(mat1).asNode();
+        auto triangle2 = Builder<Triangle>(vec3{0, -0.8, 0}, vec3{0.6, -0.2, 0.8}, vec3{0.6, -0.2, -0.8})
+                .withMaterial(mat2).asNode();
+
+        auto positioned = Builder<Transform>(triangle1 + triangle2 % 0.2,
+                                             vec3{-0.4, 0.3, 0},
+                                             vec3{std::numbers::pi / 6, 0, 0},
+                                             vec3{2}).asNode();
+
+        scene->addSDFObject(positioned);
+
+        auto ground = Builder<Plane>(vec3{0, -1.f, 0}, 1.f).asNode();
+        ground->setMaterial(Material{
+                .albedo{0.8, 0.8, 0.8},
+                .ks = 0.2f,
+                .p = 128,
+                .ior = 1.33f
+        });
+        scene->addSDFObject(ground);
+
+        return scene;
+    }
 }
 #endif //PROJECT_EXAMPLES_H
