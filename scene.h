@@ -1,7 +1,3 @@
-//
-// Created by Yannis on 06/04/2021.
-//
-
 #ifndef SECONDLAB_SCENE_H
 #define SECONDLAB_SCENE_H
 
@@ -14,14 +10,19 @@
 
 struct SceneProperties {
     vec3 backgroundColor = vec3{0};
-    bool debugNormals = false;
     bool illumination = false;
     bool fresnel = false;
     bool shadowing = false;
-    float shadowIntensity = 1.f;
+    bool absorption = false;
+    float shadowIntensity = 16.f;
     int maxRaymarchSteps = 500;
     float maxRaymarchDist = 20.f;
-    int maxDepth = 0;
+    int maxDepth = 4;
+};
+
+struct DebugProperties {
+    bool normals = false;
+    bool depth = false;
 };
 
 class Scene {
@@ -68,20 +69,23 @@ public:
         sdfNodes.push_back(sdf);
     }
 
-    std::pair<std::shared_ptr<sdf::Node>, float> minimumSurface(const vec3 &p);
+    void setDebugProperties(const DebugProperties& properties) {
+        debug = properties;
+    }
 
 private:
-    SceneProperties properties;
+    SceneProperties scene;
+    DebugProperties debug;
 
     std::vector<std::shared_ptr<sdf::Node>> sdfNodes;
     std::vector<std::shared_ptr<Light>> lights;
     std::vector<std::shared_ptr<Camera>> cameras;
     int activeCamIndex = 0;
-    float shadowBias = 0.1f;
 
     std::pair<vec3, vec3> computeLightingModel(const vec3 &p, const vec3 &N, const vec3 &V, const Material &material);
 
     std::pair<std::shared_ptr<sdf::Node>, float> raycast(const Ray &ray);
+    std::pair<std::shared_ptr<sdf::Node>, float> minimumSurface(const vec3 &p);
 
     float computeShadow(const Ray &r, float k);
 
@@ -100,7 +104,7 @@ private:
     vec3 trace(const Ray &ray, int depth);
 };
 
-Scene::Scene(const SceneProperties &properties) : properties(properties) {}
+Scene::Scene(const SceneProperties &properties) : scene(properties) {}
 
 std::pair<vec3, vec3>
 Scene::computeLightingModel(const vec3 &p, const vec3 &N, const vec3 &V, const Material &material) {
@@ -115,18 +119,21 @@ Scene::computeLightingModel(const vec3 &p, const vec3 &N, const vec3 &V, const M
         float dotLN = glm::dot(L, N);
         float dotRV = glm::dot(R, V);
 
-        I_D += light->color * glm::max(dotLN, 0.0f) * light->intensity /
-               (float) (4.0f * std::numbers::pi * glm::length(light->position - p));
-        I_S += light->color * glm::pow(glm::max(dotRV, 0.0f), material.p) * light->intensity;
-        if (properties.shadowing) {
+        vec3 D = light->color * glm::max(dotLN, 0.0f) * light->intensity / (float)(4.0f * std::numbers::pi * glm::length(light->position - p));
+        vec3 S = light->color * glm::pow(glm::max(dotRV, 0.0f), material.p) * light->intensity;
+
+        if (scene.shadowing) {
             const vec3 pos = p + sBias;
 
             const Ray r(pos, L);
-            float factor = computeShadow(r, properties.shadowIntensity);
-            I_D *= factor;
-            I_S *= factor;
+            float shadowFactor = computeShadow(r, scene.shadowIntensity);
 
+            D *= shadowFactor;
+            S *= shadowFactor;
         }
+
+        I_D += D;
+        I_S += S;
     }
 
     return {I_D, I_S};
@@ -137,33 +144,38 @@ vec3 Scene::trace(const Ray &ray, int depth) {
     auto[node, t] = raycast(ray);
 
     if (t < 0) {
-        return properties.backgroundColor;
+        return scene.backgroundColor;
     }
 
     vec3 p = ray.at(t);
 
     auto sample = node->sampleAt(p);
-    vec3 N = node->normal(p, 1e-5f);
+    vec3 N = node->normal(p, 5e-4f);
 
     bool inside = glm::dot(N, -ray.dir) < 0;
     vec3 facingNormal = inside ? -N : N;
 
     vec3 diffuse{0}, specular{0};
-    Material material = sample.material;
+    Material material = sample.material;//node->getMaterial(p);
 
-    if (properties.debugNormals) {
+    if (debug.normals) {
         return N * 0.5f + 0.5f;
     }
 
-    if (properties.illumination) {
+    if (debug.depth) {
+        vec3 col = vec3{1 - 1.0f / t};
+        return col;
+    }
+
+    if (scene.illumination) {
         std::tie(diffuse, specular) = computeLightingModel(p, facingNormal, -ray.dir, material);
     } else {
         diffuse = vec3{1};
     }
 
     float kr = 0.5f;
-    vec3 refraction{0}, reflection{0};
-    if (properties.fresnel && depth > 0) {
+    vec3 refraction{0}, reflection{0}, absorption{0};
+    if (scene.fresnel && depth > 0) {
         vec3 R = glm::normalize(glm::reflect(ray.dir, facingNormal));
 
         float etai = 1;
@@ -179,7 +191,7 @@ vec3 Scene::trace(const Ray &ray, int depth) {
 
         // reflection
         if (material.ks > 0) {
-            vec3 bias = facingNormal * 1e-3f;
+            vec3 bias = facingNormal * 1e-4f;
             vec3 rlPos = p + bias;
 
             reflection = trace(Ray(rlPos, R), depth - 1);
@@ -187,10 +199,18 @@ vec3 Scene::trace(const Ray &ray, int depth) {
 
         // refraction
         if (kr < 1 && material.transmittance > 0 && material.ks > 0) {
-            vec3 bias = facingNormal * 1e-3f;
+            vec3 bias = facingNormal * 1e-4f;
             vec3 rfPos = p - bias;
 
-            refraction = trace(Ray(rfPos, T), depth - 1);
+            Ray transmitted(rfPos, T);
+
+            refraction = trace(transmitted, depth - 1);
+
+            if (scene.absorption) {
+                auto[_, dist] = raycast(transmitted);
+                absorption = material.albedo * scene.maxRaymarchDist / (scene.maxRaymarchDist - dist);
+                refraction *= glm::clamp(absorption * (1 - material.absorption) * scene.maxRaymarchDist, 0.f, 1.f);
+            }
         }
     }
 
@@ -200,9 +220,8 @@ vec3 Scene::trace(const Ray &ray, int depth) {
 
 vec3 Scene::finalColor(const Material &material, const vec3 &diffuse, const vec3 &specular, const vec3 &refraction,
                        const vec3 &reflection, float kr) {
-    kr = (1 - material.transmittance) + kr * (material.transmittance);
     vec3 rl = reflection * kr * material.ks;
-    vec3 rf = refraction * (1 - kr);
+    vec3 rf = refraction * (1 - kr) * material.transmittance;
     vec3 fresnel = rl + rf;
 
     vec3 I_A = material.albedo * (material.ka / (float) lights.size());
@@ -231,7 +250,7 @@ std::pair<std::shared_ptr<sdf::Node>, float> Scene::raycast(const Ray &ray) {
     float t = 0.0f;
 
     std::shared_ptr<sdf::Node> hit;
-    for (int i = 0; i < properties.maxRaymarchSteps; ++i) {
+    for (int i = 0; i < scene.maxRaymarchSteps; ++i) {
         float min = std::numeric_limits<float>::infinity();
         std::tie(hit, min) = minimumSurface(ray.at(t));
         min = glm::abs(min);
@@ -239,7 +258,7 @@ std::pair<std::shared_ptr<sdf::Node>, float> Scene::raycast(const Ray &ray) {
             break;
         }
         t += min;
-        if (t > properties.maxRaymarchDist) {
+        if (t > scene.maxRaymarchDist) {
             t = -1;
             break;
         }
@@ -273,7 +292,7 @@ float Scene::computeShadow(const Ray &r, float k) {
     float res = 1.0f;
     float ph = std::numeric_limits<float>::max();
     float t = 0.0f;
-    for (int i = 0; i < properties.maxRaymarchSteps; ++i) {
+    for (int i = 0; i < scene.maxRaymarchSteps; ++i) {
         vec3 p = r.at(t);
         auto[closest, h] = minimumSurface(p);
 
@@ -282,11 +301,11 @@ float Scene::computeShadow(const Ray &r, float k) {
         }
 
         float y = h * h / (2.0f * ph);
-        float d = glm::sqrt(h * h - y * y);
-        res = glm::min(res, k * d / glm::max(0.0f, t - y));
+        float d = glm::sqrt(glm::abs(h * h - y * y));
+        res = glm::min(res, k * d / glm::max(0.0001f, t - y));
         ph = h;
         t += h;
-        if (t > properties.maxRaymarchDist) {
+        if (t > scene.maxRaymarchDist) {
             break;
         }
     }
@@ -297,7 +316,7 @@ vec3 Scene::trace(const Ray &ray) {
     if (lights.empty()) {
         addDefaultLight();
     }
-    return trace(ray, properties.maxDepth);
+    return trace(ray, scene.maxDepth);
 }
 
 

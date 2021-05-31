@@ -7,8 +7,8 @@
 // ----------------------------------------------------------------------------
 // GLOBAL VARIABLES
 
-const int SCREEN_WIDTH = 720;
-const int SCREEN_HEIGHT = 720;
+constexpr int SCREEN_WIDTH = 720;
+constexpr int SCREEN_HEIGHT = 720;
 SDL_Surface *screen;
 int t;
 
@@ -31,7 +31,8 @@ int main(int argc, char *argv[]) {
 
     framebuffer = std::vector<std::tuple<int, int, vec3>>(SCREEN_WIDTH * SCREEN_HEIGHT);
 
-    scene = example::phong(SCREEN_WIDTH, SCREEN_HEIGHT);
+    scene = example::triangles(SCREEN_WIDTH, SCREEN_HEIGHT);
+    //scene->setDebugProperties(DebugProperties{.normals = true});
 
     Draw();
     Update();
@@ -96,7 +97,7 @@ void SetFramebuffer(int x, int y, const glm::vec3 &color) {
 }
 
 void Draw() {
-
+#pragma omp parallel for
     for (int y = 0; y < SCREEN_HEIGHT; ++y) {
 #pragma omp parallel for
         for (int x = 0; x < SCREEN_WIDTH; ++x) {

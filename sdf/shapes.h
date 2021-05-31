@@ -1,7 +1,3 @@
-//
-// Created by Yannis on 22/05/2021.
-//
-
 #ifndef PROJECT_SHAPES_H
 #define PROJECT_SHAPES_H
 
@@ -11,63 +7,82 @@ namespace sdf {
     using glm::vec3;
     using glm::vec2;
 
-    class Sphere : public Node {
+    // Base class for SDF shapes. This is where implementations of signed distance functions reside.
+    class Primitive : public Node {
+    protected:
+        Material mat;
+    public:
+        Primitive() = default;
+
+        Sample sampleAt(const glm::vec3 &p) final {
+            Sample sample;
+            sample.value = signedDistance(p);
+            sample.material = mat;
+            return sample;
+        }
+
+        void setMaterial(const Material &material) {
+            mat = material;
+        }
+
+        [[nodiscard]] Material getMaterial(const vec3 &p) const {
+            return mat;
+        }
+    };
+
+    // Sphere SDF. Defined by a radius.
+    class Sphere : public Primitive {
     private:
         float r;
     public:
         explicit Sphere(float radius) : r(radius) {}
 
-        Sample sampleAt(const glm::vec3 &p) override {
-            Sample sample;
-            sample.value = signedDistance(p);
-            sample.material = sample.value <= 0.01 ? mat : outside;
-            return sample;
-        }
-
-        [[nodiscard]] float signedDistance(const glm::vec3 &p) override {
+        float signedDistance(const glm::vec3 &p) override {
             return glm::length(p) - r;
         }
     };
 
-    class Plane : public Node {
+    // Plane SDF. Defined by a normal vector and a height.
+    class Plane : public Primitive {
     private:
         const vec3 normal;
         float h;
     public:
         Plane(const vec3 &n, float h) : h(h), normal(n) {}
 
-        Sample sampleAt(const glm::vec3 &p) override {
-            Sample sample;
-            sample.value = signedDistance(p);
-            sample.material = sample.value <= 0.01 ? mat : outside;
-            return sample;
-        }
-
-        [[nodiscard]] float signedDistance(const glm::vec3 &p) override {
+        float signedDistance(const glm::vec3 &p) override {
             return glm::dot(p, normal) + h;
         }
     };
 
-    class Torus : public Node {
+    // Torus SDF. Defined by inner and outer radii.
+    class Torus : public Primitive {
     private:
         vec2 r;
     public:
         explicit Torus(const vec2 &radii) : r(radii) {}
 
-        [[nodiscard]] float signedDistance(const glm::vec3 &p) override {
+        float signedDistance(const glm::vec3 &p) override {
             vec2 q = vec2(glm::length(glm::xz(p)) - r.x, p.y);
             return glm::length(q) - r.y;
         }
+    };
 
-        Sample sampleAt(const glm::vec3 &p) override {
-            Sample sample;
-            sample.value = signedDistance(p);
-            sample.material = sample.value <= 0.01 ? mat : outside;
-            return sample;
+    // Closed Box SDF. Defined by extent from origin.
+    class Box : public Primitive {
+    private:
+        glm::vec3 dimensions;
+    public:
+        explicit Box(const glm::vec3& dimensions) : dimensions(dimensions) {}
+
+        float signedDistance(const glm::vec3 &p) override {
+            glm::vec3 q = glm::abs(p) - dimensions;
+            return glm::length(glm::max(q, 0.0f)) + glm::min(glm::max(q.x, glm::max(q.y, q.z)), 0.0f);
         }
     };
 
-    class Triangle : public Node {
+    // Triangle SDF. Defined by three vertices in world space.
+    class Triangle : public Primitive {
     private:
         glm::vec3 v0, v1, v2;
         glm::vec3 e0, e1, e2;
@@ -94,9 +109,7 @@ namespace sdf {
             ln = 1.0f / glm::dot(normal, normal);
         }
 
-        [[nodiscard]] Sample sampleAt(const glm::vec3 &p) override {
-            Sample sample;
-
+        float signedDistance(const vec3 &p) override {
             vec3 p0 = p - v0;
             vec3 p1 = p - v1;
             vec3 p2 = p - v2;
@@ -112,13 +125,13 @@ namespace sdf {
                         ),
                         glm::length(e2 * glm::clamp(glm::dot(e2, p2) * l2, 0.0f, 1.0f) - p2)
                 );
+
             } else {
                 val = glm::dot(normal, p0) * glm::dot(normal, p0) * ln;
+                val = glm::sqrt(val);
             }
 
-            sample.value = glm::sqrt(val) - 0.001f;
-
-            return sample;
+            return val - 0.001f;
         }
     };
 }
