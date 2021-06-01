@@ -73,7 +73,7 @@ namespace sdf {
     private:
         glm::vec3 dimensions;
     public:
-        explicit Box(const glm::vec3& dimensions) : dimensions(dimensions) {}
+        explicit Box(const glm::vec3 &dimensions) : dimensions(dimensions) {}
 
         float signedDistance(const glm::vec3 &p) override {
             glm::vec3 q = glm::abs(p) - dimensions;
@@ -87,22 +87,17 @@ namespace sdf {
         glm::vec3 v0, v1, v2;
         glm::vec3 e0, e1, e2;
         glm::vec3 normal;
-
         glm::vec3 c0, c1, c2;
+
         float l0, l1, l2, ln;
 
     public:
         Triangle(const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2)
-                : v0(v0), v1(v1), v2(v2) {
-            e0 = v1 - v0;
-            e1 = v2 - v1;
-            e2 = v0 - v2;
-            normal = glm::normalize(glm::cross(e0, e2));
-
-            c0 = glm::cross(e0, normal);
-            c1 = glm::cross(e1, normal);
-            c2 = glm::cross(e2, normal);
-
+                : v0(v0), v1(v1), v2(v2),
+                e0(v1 - v0), e1(v2 - v1), e2(v0 - v2),
+                c0(glm::cross(e0, normal)), c1(glm::cross(e1, normal)), c2(glm::cross(e2, normal)),
+                normal(glm::normalize(glm::cross(e0, e2)))
+        {
             l0 = 1.0f / glm::dot(e0, e0);
             l1 = 1.0f / glm::dot(e1, e1);
             l2 = 1.0f / glm::dot(e2, e2);

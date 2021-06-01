@@ -27,7 +27,7 @@ struct DebugProperties {
 
 class Scene {
 public:
-    explicit Scene(const SceneProperties &properties = SceneProperties{});
+    explicit Scene(const SceneProperties &properties = SceneProperties{}) : scene(properties) {}
 
     vec3 trace(const Ray &ray);
 
@@ -104,8 +104,7 @@ private:
     vec3 trace(const Ray &ray, int depth);
 };
 
-Scene::Scene(const SceneProperties &properties) : scene(properties) {}
-
+// Phong lighting model.
 std::pair<vec3, vec3>
 Scene::computeLightingModel(const vec3 &p, const vec3 &N, const vec3 &V, const Material &material) {
     vec3 I_D{0, 0, 0}, I_S{0, 0, 0};
@@ -150,20 +149,21 @@ vec3 Scene::trace(const Ray &ray, int depth) {
     vec3 p = ray.at(t);
 
     auto sample = node->sampleAt(p);
-    vec3 N = node->normal(p, 5e-4f);
+    vec3 N = node->normal(p, 1e-4f);
 
     bool inside = glm::dot(N, -ray.dir) < 0;
     vec3 facingNormal = inside ? -N : N;
 
     vec3 diffuse{0}, specular{0};
-    Material material = sample.material;//node->getMaterial(p);
+    Material material = sample.material;
 
     if (debug.normals) {
         return N * 0.5f + 0.5f;
     }
 
     if (debug.depth) {
-        vec3 col = vec3{1 - 1.0f / t};
+        vec3 c = p - getActiveCamera()->pos();
+        vec3 col = vec3{1.0f / c.z};
         return col;
     }
 
@@ -174,7 +174,7 @@ vec3 Scene::trace(const Ray &ray, int depth) {
     }
 
     float kr = 0.5f;
-    vec3 refraction{0}, reflection{0}, absorption{0};
+    vec3 refraction{0}, reflection{0}, absorption{0, 0, 0};
     if (scene.fresnel && depth > 0) {
         vec3 R = glm::normalize(glm::reflect(ray.dir, facingNormal));
 
@@ -204,13 +204,12 @@ vec3 Scene::trace(const Ray &ray, int depth) {
 
             Ray transmitted(rfPos, T);
 
-            refraction = trace(transmitted, depth - 1);
-
             if (scene.absorption) {
-                auto[_, dist] = raycast(transmitted);
-                absorption = material.albedo * scene.maxRaymarchDist / (scene.maxRaymarchDist - dist);
-                refraction *= glm::clamp(absorption * (1 - material.absorption) * scene.maxRaymarchDist, 0.f, 1.f);
+                auto[inner, dist] = raycast(transmitted);
+                absorption = material.albedo * (1.0f / glm::pow((dist + 1), 1.f)) * material.absorption;
             }
+
+            refraction = trace(transmitted, depth - 1);
         }
     }
 
@@ -232,6 +231,7 @@ vec3 Scene::finalColor(const Material &material, const vec3 &diffuse, const vec3
     return glm::clamp(local + fresnel, 0.f, 1.f);
 }
 
+// Find the Node that produces the smallest signed distance out of all nodes.
 std::pair<std::shared_ptr<sdf::Node>, float> Scene::minimumSurface(const vec3 &p) {
 
     float min = std::numeric_limits<float>::infinity();
@@ -246,6 +246,7 @@ std::pair<std::shared_ptr<sdf::Node>, float> Scene::minimumSurface(const vec3 &p
     return std::make_pair(minNode, min);
 }
 
+// Implementation of Sphere Casting, adapted for negative distances.
 std::pair<std::shared_ptr<sdf::Node>, float> Scene::raycast(const Ray &ray) {
     float t = 0.0f;
 
@@ -288,6 +289,7 @@ float Scene::computeFresnel(const vec3 &I, const vec3 &N, float etai, float etat
     return kr;
 }
 
+// Soft shadows for SDFs. https://iquilezles.org/www/articles/rmshadows/rmshadows.htm
 float Scene::computeShadow(const Ray &r, float k) {
     float res = 1.0f;
     float ph = std::numeric_limits<float>::max();

@@ -7,8 +7,8 @@
 namespace sdf::utils {
 
     /**
-     * A utility class for constructing SDF Nodes
-     * @tparam T Type of SDF to construct, must be derived from sdf::Node
+     * Utility class for constructing CSG Nodes
+     * @tparam T Type of Node to construct, must be derived from sdf::Node
      */
     template<class T> requires std::is_base_of_v<Node, T>
     class Builder {
@@ -18,7 +18,7 @@ namespace sdf::utils {
         NodePtr node;
     public:
         template<typename ...Args>
-        requires requires(T t, Args &&... args) { T(args...); }
+        requires std::is_constructible_v<T, Args...>
         explicit Builder(Args &&... args) {
             node = std::make_shared<T>(std::forward<Args>(args)...);
         }
@@ -34,12 +34,12 @@ namespace sdf::utils {
 
         Builder<Transform> withTransform(const vec3 &position = vec3{0},
                                          const vec3 &rotation = vec3{0},
-                                         const vec3 &scale = vec3{1}) {
+                                         const vec3 &scale = vec3{1}) requires (!std::is_same_v<Transform, T>) {
             return Builder<Transform>(node, position, rotation, scale);
         }
     };
 
-    // Shorthand for making and empty CSG Node
+    /* Utility method for making an empty CSG Node. */
     static std::shared_ptr<Node> make_empty() {
         return std::make_shared<Empty>();
     }
@@ -48,8 +48,8 @@ namespace sdf::utils {
      * Obtain the Union of two CSG trees. (Commutative)
      * @details
      * Depending on whether one of the nodes is an instance of sdf::ops::Round, i.e. a Node with a rounding operation
-     * applied to it, the operation will remove the operation from the tree and apply the rounding in the intersection
-     * with the same amount as used in the original rounding operation.
+     * applied to it, the operation will remove the operation from the tree and apply the rounding in the union
+     * node with the same amount as used in the original rounding operation.
      */
     template<class A, class B>
     std::shared_ptr<sdf::ops::Union>
@@ -77,8 +77,8 @@ namespace sdf::utils {
      * Obtain the Difference between two CSG trees. (NOT commutative)
      * @details
      * Depending on whether one of the nodes is an instance of sdf::ops::Round, i.e. a Node with a rounding operation
-     * applied to it, the operation will remove the operation from the tree and apply the rounding in the intersection
-     * with the same amount as used in the original rounding operation.
+     * applied to it, the operation will remove the operation from the tree and apply the rounding in the Difference
+     * node with the same amount as used in the original rounding operation.
      */
     template<class A, class B>
     std::shared_ptr<sdf::ops::Difference>
@@ -106,8 +106,8 @@ namespace sdf::utils {
      * Obtain the Intersection of two CSG trees. (Commutative)
      * @details
      * Depending on whether one of the nodes is an instance of sdf::ops::Round, i.e. a Node with a rounding operation
-     * applied to it, the operation will remove the operation from the tree and apply the rounding in the intersection
-     * with the same amount as used in the original rounding operation.
+     * applied to it, the operation will remove the operation from the tree and apply the rounding in the Intersection
+     * node with the same amount as used in the original rounding operation.
      */
     template<class A, class B>
     std::shared_ptr<sdf::ops::Intersection>
@@ -135,7 +135,7 @@ namespace sdf::utils {
      * Apply onioning to the product of a given CSG, producing a shell of the object. Produces multiple concentric
      * shells if applied consecutively.
      * @param a Root node of CSG tree to apply operation to
-     * @param shell_thickness How thick the resulting object shell should be, in world distance
+     * @param shell_thickness How thick the resulting object shell should be, in world units
      */
     std::shared_ptr<sdf::ops::Onion> operator^(const std::shared_ptr<Node> &a, float shell_thickness) {
         return Builder<sdf::ops::Onion>(a, shell_thickness).asNode();

@@ -4,6 +4,7 @@
 #include "scene.h"
 #include "sdf/sdf.h"
 
+/** A collection of scenes to showcase rendering features */
 namespace example {
     using glm::vec3;
     using glm::mat3;
@@ -164,7 +165,7 @@ namespace example {
                         vec3{0.5, -0.5, -0.2},
                         vec3{std::numbers::pi / 1.5, std::numbers::pi / 6, 0}
                 ).asNode();
-        scene->addSDFObject(ring + (die) % 0.1);
+        scene->addSDFObject(ring + die % 0.1);
 
         auto ground = Builder<Plane>(vec3{0, -1.f, 0}, 1.f).asNode();
         ground->setMaterial(Material{
@@ -183,13 +184,13 @@ namespace example {
                 .backgroundColor{0.8, 0.8, 0.9},
                 .illumination = true,
                 .fresnel = true,
-                .maxDepth = 8
+                .maxDepth = 6
         });
 
         auto mainLight = std::make_shared<Light>(vec3{-0.4, -1.0, -0.7}, vec3{1, 1, 1}, 10.f);
         scene->addLight(mainLight);
 
-        auto light1 = std::make_shared<Light>(vec3{1.3, 0.5, -1.1}, vec3{0.4, 0.4, 1}, 15.f);
+        auto light1 = std::make_shared<Light>(vec3{1.3, 0.5, -1.1}, vec3{1, 1, 1}, 15.f);
         scene->addLight(light1);
 
         auto camera = std::make_shared<Camera>(vec3{0, 0, -3.f}, vec3{0, 1.f, 0}, (float) width);
@@ -217,7 +218,7 @@ namespace example {
                 .withMaterial(mat2).asNode();
 
         auto positioned = Builder<Transform>(triangle1 + triangle2 % 0.2,
-                                             vec3{-0.4, 0.3, 0},
+                                             vec3{-0.4, 0.2, 0},
                                              vec3{std::numbers::pi / 6, 0, 0},
                                              vec3{2}).asNode();
 

@@ -7,26 +7,27 @@
 
 namespace sdf {
 
-    // Represents the compound return value of a SDF. Includes the sampled distance and material.
+    /* Represents the compound return value of a SDF. Includes the sampled distance and material. */
     struct Sample {
         float value = std::numeric_limits<float>::infinity();
         Material material;
     };
 
-    // Base class for all SDF objects. Used for building CSG trees.
+    /* Base class for all SDF objects. Used for building CSG trees. */
     class Node {
     public:
 
         Node() = default;
 
-        // Obtain a sample of the SDF at the given point, containing distance and material
+        /* Obtain a sample of the SDF at the given point, containing distance and material. */
         [[nodiscard]] virtual Sample sampleAt(const glm::vec3 &p) = 0;
 
-        // Evaluate the SDF at a given point, yielding a distance value
+        /* Evaluate the SDF at a given point, yielding a distance value. */
         [[nodiscard]] virtual float signedDistance(const glm::vec3 &p) = 0;
 
         /**
          * Compute the normal vector at a given point.
+         * @details
          * The point need not be on the surface of the SDF, in which case the normal represents the tangent vector to
          * the gradient of the field represented by the SDF. May be costly to compute depending on the complexity of the SDF.
          * @param p Point to evaluate
@@ -49,6 +50,7 @@ namespace sdf {
         static std::shared_ptr<Node> Empty;
     };
 
+    /* Empty node for building CSG trees. */
     class Empty final : public Node {
     public:
         Sample sampleAt(const vec3 &p) override {

@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     framebuffer = std::vector<std::tuple<int, int, vec3>>(SCREEN_WIDTH * SCREEN_HEIGHT);
 
     scene = example::triangles(SCREEN_WIDTH, SCREEN_HEIGHT);
-    //scene->setDebugProperties(DebugProperties{.normals = true});
+    //scene->setDebugProperties(DebugProperties{.depth = true});
 
     Draw();
     Update();

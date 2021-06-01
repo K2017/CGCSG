@@ -10,44 +10,52 @@
 class Material {
 public:
 
-    /* Surface color
+    /** Surface color
+     * @details
      * Components: 0 to 1 inclusive
      */
     glm::vec3 albedo{0, 0, 0};
 
-    /* Diffuse coefficient
+    /** Diffuse coefficient
+     * @details
      * 0 to 1 inclusive
      */
     float kd = 1;
 
-    /* Ambient coefficient
+    /** Ambient coefficient
+     * @details
      * 0 to 1 inclusive
      */
     float ka = 0.1f;
 
-    /* Specular coefficient
+    /** Specular coefficient
+     * @details
      * 0 to 1 inclusive
      */
     float ks = 0;
 
-    /* Specular power
+    /** Specular power
+     * @details
      * 1 to 256 inclusive
      */
     float p = 4.0f;
 
-    /* Index of refraction
+    /** Index of refraction
+     * @details
      * Air = 1
      * Glass = 1.5
      * Water = 1.33
      */
     float ior = 1;
 
-    /* Coefficient of Transmittance
+    /** Coefficient of Transmittance
+     * @details
      * 0 to 1 inclusive
      */
     float transmittance = 0.0f;
 
-    /* How much light the inner material absorbs
+    /** How much light the inner material absorbs
+     * @details
      * Percentage from 0 to 1
      */
     float absorption = 0.0f;
