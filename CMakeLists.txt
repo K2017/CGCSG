@@ -5,7 +5,7 @@ project ( SDFCSG )
 
 set(CMAKE_CXX_STANDARD 20)
 
-find_package(OpenMP REQUIRED)
+find_package(OpenMP)
 find_package(SDL REQUIRED)
 find_package(glm REQUIRED)
 
@@ -22,4 +22,8 @@ if(SDL_FOUND)
 	target_link_libraries(SDFCSG PRIVATE ${SDL_LIBRARY})
 endif(SDL_FOUND)
 
-target_link_libraries(SDFCSG PRIVATE glm::glm OpenMP::OpenMP_CXX)
+if (OpenMP_CXX_FOUND)
+	target_link_libraries(SDFCSG PRIVATE OpenMP::OpenMP_CXX)
+endif(OpenMP_CXX_FOUND)
+
+target_link_libraries(SDFCSG PRIVATE glm::glm)
