@@ -1,14 +1,3 @@
-<style>
-img
-{
-    display:block; 
-    float:none; 
-    margin-left:auto;
-    margin-right:auto;
-    width:60%;
-}
-</style>
-
 # CGCSG
 
 A playground for visualising Signed Distance Functions and Constructive Solid Geometry using Raymarching in C++.
@@ -21,6 +10,8 @@ A playground for visualising Signed Distance Functions and Constructive Solid Ge
 Optionally:
 * `OpenMP 2.0 or greater`
 
-![Dice](https://github.com/K2017/CGCSG/blob/main/screenshots/sdf_csg.png)
+<p align="center">
+    <img src="https://github.com/K2017/CGCSG/blob/main/screenshots/sdf_csg.png">
+</p>
 
 For more screenshots check out the ![gallery](#).
