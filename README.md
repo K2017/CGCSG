@@ -14,4 +14,4 @@ Optionally:
     <img src="https://github.com/K2017/CGCSG/blob/main/screenshots/sdf_csg.png">
 </p>
 
-For more screenshots check out the ![gallery](#).
+For more screenshots check out the ![gallery](https://github.com/K2017/CGCSG/blob/main/screenshots/gallery.md).
