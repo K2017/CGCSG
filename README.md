@@ -2,6 +2,8 @@
 
 A playground for visualising Signed Distance Functions and Constructive Solid Geometry using Raymarching in C++.
 
+A project for the course ![DH2323](https://www.kth.se/student/kurser/kurs/DH2323?l=en) 'Computer Graphics and Interaction' at KTH Stockholm.
+
 ## Requirements
 * `CMake version 3.9 or greater` 
 * `SDL version 2`
